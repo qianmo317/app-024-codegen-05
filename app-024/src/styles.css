@@ -200,6 +200,36 @@ textarea.input { resize: vertical; }
 .lib-card h3 { color: var(--red); margin-top: 0; }
 .lib-card .example { background: #fdfaf2; border-radius: 8px; padding: 8px 10px; }
 
+/* ---- 结算报表 ---- */
+.report-doc-head { text-align: center; margin-bottom: 12px; }
+.report-doc-head h2 { font-size: 20px; margin: 0 0 4px; color: var(--red-dark); }
+.report-doc-head p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.rpt-sec {
+  background: var(--card-bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin-bottom: 14px;
+}
+.rpt-sec h3 { margin-top: 2px; }
+.rpt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 860px) { .rpt-grid { grid-template-columns: 1fr; } }
+.rpt-overview td { font-size: 20px; font-weight: 700; color: var(--red); text-align: center; }
+.rpt-overview th { text-align: center; }
+.rpt-sum-row { cursor: pointer; }
+.rpt-sum-row:hover { background: #fdf6e3; }
+.rpt-sum-open { background: #fdf3d7; }
+.rpt-caret { float: right; color: var(--muted); font-size: 12px; }
+.rpt-detail td { background: #fdfaf2; padding: 8px 12px; }
+.rpt-detail-table { font-size: 13px; background: #fff; border: 1px solid var(--line); }
+.rpt-detail-table th, .rpt-detail-table td { padding: 5px 8px; }
+.rpt-total td { font-weight: 700; background: #faf4e6; border-top: 2px solid var(--line); }
+.rpt-note { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+.rpt-notes { margin: 4px 0 8px; padding-left: 20px; }
+.rpt-notes li { margin-bottom: 4px; }
+.rpt-anomaly-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 860px) { .rpt-anomaly-grid { grid-template-columns: 1fr; } }
+.rpt-unsolved-wrap { max-height: 420px; overflow-y: auto; }
+.rpt-unsolved-print { display: none; } /* 仅打印时显示的三栏紧凑清单 */
+.rpt-sec .no-cell { font-weight: 700; color: var(--red); }
+
 /* ================= 打印 ================= */
 .print-area { margin-top: 10px; }
 .sheet {
@@ -232,9 +262,9 @@ textarea.input { resize: vertical; }
 @media print {
   @page { size: A4 portrait; margin: 0; }
   html, body { background: #fff; }
-  .no-print, .topbar, .footer, .app > .container > *:not(.print-area):not(.page-head) { display: none !important; }
+  /* 页面已用 no-print 标出控件区；页头/页脚/页标题一律不上纸 */
+  .no-print, .topbar, .footer, .page-head { display: none !important; }
   .app > .container { padding: 0; max-width: none; }
-  .page-head { display: none !important; }
   .print-area { margin: 0; }
   .sheet {
     box-shadow: none; border: none; margin: 0; padding: 10mm;
@@ -242,4 +272,32 @@ textarea.input { resize: vertical; }
   }
   .sheet:last-child { page-break-after: auto; break-after: auto; }
   .card, .card * { color: #000 !important; }
+
+  /* ---- 结算报表：一页纸紧凑版式 ---- */
+  .report-print { display: block; padding: 6mm 10mm; color: #000; font-size: 9pt; }
+  .report-print, .report-print * { color: #000 !important; }
+  .report-doc-head { margin-bottom: 2mm; border-bottom: 2px solid #000; padding-bottom: 1.5mm; }
+  .report-doc-head h2 { font-size: 14pt; }
+  .report-doc-head p { font-size: 9pt; }
+  .report-print .rpt-sec {
+    border: none; border-radius: 0; padding: 0; margin: 0 0 2mm; box-shadow: none;
+    page-break-inside: avoid; break-inside: avoid;
+  }
+  .report-print .rpt-sec h3 { font-size: 10pt; margin: 0 0 0.8mm; }
+  .report-print .rpt-sec h4 { font-size: 9pt; margin: 1mm 0 0.5mm; }
+  .report-print table { font-size: 8pt; }
+  .report-print th, .report-print td { padding: 0.7mm 1.4mm; }
+  .report-print th { background: #eee; }
+  .report-print .rpt-overview td { font-size: 11pt; }
+  .report-print .rpt-grid { grid-template-columns: 1fr 1fr; gap: 2.5mm; }
+  .report-print .rpt-detail { display: none !important; } /* 复核明细只在屏幕上展开，不上纸 */
+  .report-print .rpt-sum-open { background: none; }
+  .report-print .rpt-note { font-size: 7pt; margin-top: 0.8mm; }
+  .report-print .rpt-notes { font-size: 8pt; margin: 0.8mm 0; }
+  .report-print .rpt-anomaly-grid { grid-template-columns: 1fr 1fr; gap: 2.5mm; }
+  .report-print .rpt-unsolved-print {
+    display: block; list-style: none; margin: 0; padding: 0;
+    column-count: 3; column-gap: 4mm; font-size: 7.5pt; line-height: 1.4;
+  }
+  .report-print .rpt-unsolved-print li { break-inside: avoid; }
 }

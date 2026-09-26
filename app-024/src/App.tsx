@@ -4,6 +4,7 @@ import { RiddleList } from './pages/RiddleList';
 import { RiddleEdit } from './pages/RiddleEdit';
 import { PrintPage } from './pages/PrintPage';
 import { Onsite } from './pages/Onsite';
+import { Report } from './pages/Report';
 import { Library } from './pages/Library';
 import { Settings } from './pages/Settings';
 
@@ -11,6 +12,7 @@ const NAV: { href: string; label: string; match: Route['name'] }[] = [
   { href: '#/', label: '谜库', match: 'list' },
   { href: '#/print', label: '出条打印', match: 'print' },
   { href: '#/onsite', label: '现场登记', match: 'onsite' },
+  { href: '#/report', label: '结算报表', match: 'report' },
   { href: '#/library', label: '谜格说明', match: 'library' },
   { href: '#/settings', label: '设置', match: 'settings' },
 ];
@@ -62,6 +64,7 @@ export function App() {
           {route.name === 'edit' && <RiddleEdit id={route.id} />}
           {route.name === 'print' && <PrintPage />}
           {route.name === 'onsite' && <Onsite />}
+          {route.name === 'report' && <Report />}
           {route.name === 'library' && <Library />}
           {route.name === 'settings' && <Settings />}
         </main>

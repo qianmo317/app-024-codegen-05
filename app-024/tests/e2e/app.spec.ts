@@ -213,9 +213,116 @@ test.describe('元宵灯谜库 E2E', () => {
     await importSample(page);
     await page.goto('/#/print');
     await page.goto('/#/onsite');
+    await page.goto('/#/report');
     await page.goto('/#/library');
     await page.goto('/#/settings');
     expect(errors).toEqual([]);
+  });
+
+  test('结算报表：汇总数字、范围切换、逐项复核、异常提示', async ({ page }) => {
+    await importSample(page);
+    // 登记两条：谜号 1 署名张三+一等奖；谜号 2 匿名（领奖未登记猜中者）
+    await page.click('nav >> text=现场登记');
+    await page.fill('.onsite-no', '1');
+    await page.click('button:has-text("查找")');
+    await page.fill('.onsite-current input.input >> nth=0', '张三');
+    await page.selectOption('.onsite-current select.input', '一等奖');
+    await page.click('button:has-text("✓ 登记猜中")');
+    await page.fill('.onsite-no', '2');
+    await page.click('button:has-text("查找")');
+    await page.selectOption('.onsite-current select.input', '参与奖');
+    await page.click('button:has-text("✓ 登记猜中")');
+
+    await page.click('nav >> text=结算报表');
+    await expect(page).toHaveURL(/#\/report/);
+    // 总览五个数
+    await expect(page.locator('[data-testid=ov-total]')).toHaveText('53');
+    await expect(page.locator('[data-testid=ov-solved]')).toHaveText('2');
+    await expect(page.locator('[data-testid=ov-unsolved]')).toHaveText('51');
+    await expect(page.locator('[data-testid=ov-records]')).toHaveText('2');
+    await expect(page.locator('[data-testid=ov-prizes]')).toHaveText('2');
+
+    // 按奖项汇总：一等奖行 发放 1、猜中 1；点击行展开明细复核
+    const prizeSec = page.locator('.rpt-summary', { hasText: '按奖项汇总' });
+    const firstPrizeRow = prizeSec.locator('tbody tr', { hasText: '一等奖' }).first();
+    await expect(firstPrizeRow.locator('td').nth(2)).toHaveText('1');
+    await expect(firstPrizeRow.locator('td').nth(3)).toHaveText('1');
+    const joinRow = prizeSec.locator('tbody tr', { hasText: '参与奖' }).first();
+    await expect(joinRow.locator('td').nth(2)).toHaveText('1');
+    await expect(joinRow.locator('td').nth(3)).toHaveText('1');
+    await firstPrizeRow.click();
+    await expect(page.locator('.rpt-detail')).toContainText('张三');
+    await expect(page.locator('.rpt-detail')).toContainText('一口咬掉牛尾巴');
+    // 按谜目汇总：猜一字行 猜中 2 条
+    const catSec = page.locator('.rpt-summary', { hasText: '按谜目汇总' });
+    await expect(catSec.locator('tbody tr', { hasText: '猜一字' }).first()).toContainText('2');
+
+    // 第六节：51 条没人猜中；第七节：1 条领奖未登记猜中者；第八节有提示
+    await expect(page.locator('.rpt-sec h3', { hasText: '没人猜中的谜条' })).toContainText('51 条');
+    await expect(page.locator('.rpt-sec h3', { hasText: '领了奖却没有登记猜中者' })).toContainText('1 条');
+    await expect(page.locator('.rpt-notes')).toContainText('领了奖却没有登记猜中者');
+
+    // 换统计范围：选一个没有登记的过去日期 → 数字全部归零；切回后恢复
+    await page.selectOption('.panel select.input', 'day');
+    await page.fill('input[type=date]', '2020-01-01');
+    await expect(page.locator('[data-testid=ov-solved]')).toHaveText('0');
+    await expect(page.locator('[data-testid=ov-records]')).toHaveText('0');
+    await expect(page.locator('[data-testid=ov-unsolved]')).toHaveText('53');
+    await expect(page.locator('.report-doc-head')).toContainText('2020-01-01（单日）');
+    await page.selectOption('.panel select.input', 'all');
+    await expect(page.locator('[data-testid=ov-solved]')).toHaveText('2');
+    await expect(page.locator('[data-testid=ov-prizes]')).toHaveText('2');
+  });
+
+  test('结算报表：导出 CSV 两次一致、打印页眉与一页纸版式', async ({ page }) => {
+    await importSample(page);
+    // 设置活动名称与主办方（打印页眉要用）
+    await page.click('nav >> text=设置');
+    await page.fill('.settings-grid input.input >> nth=0', '测试灯会');
+    await page.fill('.settings-grid input.input >> nth=1', '测试工会');
+    await page.click('button:has-text("保存活动信息")');
+    // 登记一条
+    await page.click('nav >> text=现场登记');
+    await page.fill('.onsite-no', '1');
+    await page.click('button:has-text("查找")');
+    await page.click('button:has-text("✓ 登记猜中")');
+
+    await page.click('nav >> text=结算报表');
+    // 页眉写明活动名称、主办方与统计范围
+    const head = page.locator('.report-doc-head');
+    await expect(head).toContainText('测试灯会');
+    await expect(head).toContainText('测试工会');
+    await expect(head).toContainText('统计范围：整个活动');
+
+    // 导出 CSV：BOM + 页眉四行 + 八个栏目；连续导出两次字节一致
+    const [dl1] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('button:has-text("导出报表 CSV")'),
+    ]);
+    const buf1 = readFileSync((await dl1.path())!);
+    expect([buf1[0], buf1[1], buf1[2]]).toEqual([0xef, 0xbb, 0xbf]);
+    const text = buf1.toString('utf8');
+    expect(text).toContain('结算报表');
+    expect(text).toContain('活动名称,测试灯会');
+    expect(text).toContain('主办方,测试工会');
+    expect(text).toContain('统计范围,整个活动');
+    for (const sec of ['一、总览', '二、按奖项汇总', '三、按谜目汇总', '四、按难度汇总', '五、按标签汇总', '六、没人猜中的谜条', '七、领了奖却没有登记猜中者的记录', '八、数目核对']) {
+      expect(text).toContain(sec);
+    }
+    const [dl2] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('button:has-text("导出报表 CSV")'),
+    ]);
+    expect(readFileSync((await dl2.path())!).equals(buf1)).toBe(true);
+
+    // 打印版式：报表可见、控件隐藏、未猜中清单三栏、整体不超一页 A4（297mm ≈ 1123px）
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('.report-print')).toBeVisible();
+    await expect(page.locator('.panel')).toBeHidden();
+    const colCount = await page.locator('.rpt-unsolved-print').evaluate((el) => getComputedStyle(el).columnCount);
+    expect(colCount).toBe('3');
+    const height = await page.locator('.report-print').evaluate((el) => el.getBoundingClientRect().height);
+    expect(height).toBeLessThanOrEqual(1123);
   });
 
   test('300 张谜条分页无错位（50 页 × 6 条）', async ({ page }) => {
