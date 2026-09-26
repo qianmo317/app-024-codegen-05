@@ -270,4 +270,119 @@ test.describe('元宵灯谜库 E2E', () => {
     await expect(page.locator('.stat-ok')).toContainText('3');
     await expect(page.locator('.records-table tbody tr')).toHaveCount(3);
   });
+
+  test('结算报表：汇总数字 / 未猜中清单 / 缺猜中者核对', async ({ page }) => {
+    await importSample(page);
+    // 登记两条：谜号 1 填了姓名；谜号 2 不填姓名（领奖未登记猜中者）
+    await page.click('nav >> text=现场登记');
+    await page.fill('.onsite-no', '1');
+    await page.click('button:has-text("查找")');
+    await page.fill('.onsite-current input.input >> nth=0', '张三');
+    await page.click('button:has-text("✓ 登记猜中")');
+    await page.fill('.onsite-no', '2');
+    await page.click('button:has-text("查找")');
+    await page.click('button:has-text("✓ 登记猜中")');
+
+    await page.click('nav >> text=结算报表');
+    await expect(page.locator('.page-head h1')).toContainText('结算报表');
+    // 汇总：53 条谜、猜中 2、未猜中 51、发奖 2、登记 2
+    await expect(page.locator('.stat', { hasText: '谜条总数' })).toContainText('53');
+    await expect(page.locator('.stat', { hasText: '猜中条数' })).toContainText('2');
+    await expect(page.locator('.stat', { hasText: '未猜中' })).toContainText('51');
+    await expect(page.locator('.stat', { hasText: '奖品发放' })).toContainText('2');
+    await expect(page.locator('.stat', { hasText: '登记记录' })).toContainText('2');
+    // 四个维度汇总表齐全
+    for (const name of ['按奖项汇总', '按谜目汇总', '按难度汇总', '按标签汇总']) {
+      await expect(page.locator('.panel', { hasText: name }).first()).toBeVisible();
+    }
+    // 按谜目合计行可复核：总数 53、猜中 2、发放 2
+    const catPanel = page.locator('.panel', { hasText: '按谜目汇总' });
+    await expect(catPanel.locator('tfoot tr')).toContainText('53');
+    // 未猜中谜条 51 条全部列出
+    await expect(page.locator('.panel', { hasText: '始终没人猜中的谜条' }).locator('tbody tr')).toHaveCount(51);
+    // 领奖未登记猜中者 1 条（谜号 2 · 参与奖）
+    const noWinnerPanel = page.locator('.panel', { hasText: '领了奖却没有登记猜中者' });
+    await expect(noWinnerPanel.locator('tbody tr')).toHaveCount(1);
+    await expect(noWinnerPanel.locator('tbody tr').first()).toContainText('参与奖');
+    // 数目核对指出缺猜中者
+    const issuePanel = page.locator('.panel', { has: page.getByRole('heading', { name: '数目核对', exact: true }) });
+    await expect(issuePanel).toContainText('谜号 2');
+  });
+
+  test('结算报表：切换统计范围数字随之重算', async ({ page }) => {
+    await importSample(page);
+    await page.click('nav >> text=现场登记');
+    await page.fill('.onsite-no', '1');
+    await page.click('button:has-text("查找")');
+    await page.click('button:has-text("✓ 登记猜中")');
+
+    await page.click('nav >> text=结算报表');
+    await expect(page.locator('.stat', { hasText: '猜中条数' })).toContainText('1');
+    // 切到「指定某一天」并选今天（登记发生在今天）→ 数字不变
+    const today = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    const todayStr = `${today.getFullYear()}-${p(today.getMonth() + 1)}-${p(today.getDate())}`;
+    await page.selectOption('.panel select', 'day');
+    await page.fill('input[type=date]', todayStr);
+    await expect(page.locator('.page-head h1')).toContainText(`${todayStr} 当日`);
+    await expect(page.locator('.stat', { hasText: '猜中条数' })).toContainText('1');
+    // 选一个没有登记的日期 → 全部归零、53 条全部未猜中
+    await page.fill('input[type=date]', '2020-01-01');
+    await expect(page.locator('.stat', { hasText: '猜中条数' })).toContainText('0');
+    await expect(page.locator('.stat', { hasText: '未猜中' })).toContainText('53');
+    await expect(page.locator('.stat', { hasText: '登记记录' })).toContainText('0');
+    // 切回整个活动 → 数字恢复
+    await page.selectOption('.panel select', 'all');
+    await expect(page.locator('.stat', { hasText: '猜中条数' })).toContainText('1');
+  });
+
+  test('结算报表：导出 CSV 文件 + 打印页眉含活动名称/主办方/统计范围', async ({ page }) => {
+    await importSample(page);
+    await page.click('nav >> text=现场登记');
+    await page.fill('.onsite-no', '1');
+    await page.click('button:has-text("查找")');
+    await page.click('button:has-text("✓ 登记猜中")');
+
+    await page.click('nav >> text=结算报表');
+    // 打印页眉：活动名称、主办方、统计范围
+    const sheet = page.locator('.report-sheet');
+    await expect(sheet.locator('.rp-head')).toContainText('元宵灯会');
+    await expect(sheet.locator('.rp-head')).toContainText('主办方');
+    await expect(sheet.locator('.rp-head')).toContainText('统计范围：整个活动');
+    // 导出单个 CSV 文件（UTF-8 BOM），内容含页眉与各栏目
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('button:has-text("导出报表文件")'),
+    ]);
+    const buf = readFileSync((await download.path())!);
+    expect([buf[0], buf[1], buf[2]]).toEqual([0xef, 0xbb, 0xbf]);
+    const text = buf.toString('utf8');
+    expect(text).toContain('结算报表');
+    expect(text).toContain('统计范围,整个活动');
+    expect(text).toContain('按奖项汇总');
+    expect(text).toContain('始终没人猜中的谜条');
+    expect(text).toContain('数目核对');
+  });
+
+  test('打印样式：报表页/出条页只留纸面内容，其余页面打印为空白', async ({ page }) => {
+    await importSample(page);
+    // 报表页：打印时顶栏与导航隐藏，仅保留报表页
+    await page.goto('/#/report');
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('.topbar')).toBeHidden();
+    await expect(page.locator('.report-sheet')).toBeVisible();
+    await page.emulateMedia({ media: 'screen' });
+    // 出条页：打印时谜条页可见
+    await page.goto('/#/print');
+    await page.selectOption('select >> nth=0', 'all');
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('.sheet').first()).toBeVisible();
+    await expect(page.locator('.topbar')).toBeHidden();
+    await page.emulateMedia({ media: 'screen' });
+    // 其余页面（如设置）：打印为空白
+    await page.goto('/#/settings');
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('.settings-grid')).toBeHidden();
+    await page.emulateMedia({ media: 'screen' });
+  });
 });

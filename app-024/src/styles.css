@@ -180,6 +180,36 @@ textarea.input { resize: vertical; }
 .prize-list { list-style: none; padding: 0; margin: 10px 0 0; }
 .prize-list li { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 
+/* ---- 结算报表 ---- */
+.report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 860px) { .report-grid { grid-template-columns: 1fr; } }
+.report-table th.num, .report-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.report-table tfoot td { font-weight: 700; background: #faf4e6; }
+.report-detail summary { cursor: pointer; font-size: 12.5px; color: var(--red); }
+.report-detail > div { font-size: 12.5px; color: var(--ink); margin-top: 2px; word-break: break-all; }
+
+.report-sheet {
+  width: 210mm; min-height: 297mm; background: #fff; margin: 10px auto 8mm;
+  padding: 12mm 13mm; box-shadow: 0 1px 6px rgba(0,0,0,.15); border: 1px solid var(--line);
+  color: #000;
+}
+.rp-head { border-bottom: 2px solid var(--red); padding-bottom: 5px; margin-bottom: 9px; }
+.rp-head h2 { margin: 0 0 4px; font-size: 18pt; color: #000; text-align: center; }
+.rp-head p { margin: 0; display: flex; justify-content: space-between; font-size: 10.5pt; }
+.rp-summary { font-size: 10.5pt; margin: 0 0 9px; line-height: 1.7; }
+.rp-summary b { font-size: 12pt; }
+.rp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 6mm; margin-bottom: 8px; }
+.rp-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+.rp-table th, .rp-table td { border: 1px solid #555; padding: 2px 5px; text-align: center; }
+.rp-table th { background: #f0e9d8; }
+.rp-table td:first-child, .rp-table th:first-child { text-align: left; }
+.rp-note { font-size: 8.5pt; color: #444; margin: 2px 0 0; }
+.rp-block { margin-bottom: 7px; }
+.rp-block h4 { font-size: 10.5pt; margin: 0 0 3px; }
+.rp-line { font-size: 9.5pt; margin: 0; line-height: 1.7; }
+.rp-list { font-size: 9.5pt; margin: 0; padding-left: 16px; line-height: 1.6; }
+.rp-foot { font-size: 8.5pt; color: #555; border-top: 1px solid #999; margin-top: 10px; padding-top: 4px; text-align: center; }
+
 /* ---- 大屏模式 ---- */
 .bigscreen {
   position: fixed; inset: 0; z-index: 100;
@@ -232,9 +262,10 @@ textarea.input { resize: vertical; }
 @media print {
   @page { size: A4 portrait; margin: 0; }
   html, body { background: #fff; }
-  .no-print, .topbar, .footer, .app > .container > *:not(.print-area):not(.page-head) { display: none !important; }
+  /* 只有出条打印、结算报表两页产生纸面内容；其余页面打印为空白 */
+  body:not([data-print="true"]) .container { display: none !important; }
+  .no-print, .topbar, .footer { display: none !important; }
   .app > .container { padding: 0; max-width: none; }
-  .page-head { display: none !important; }
   .print-area { margin: 0; }
   .sheet {
     box-shadow: none; border: none; margin: 0; padding: 10mm;
@@ -242,4 +273,9 @@ textarea.input { resize: vertical; }
   }
   .sheet:last-child { page-break-after: auto; break-after: auto; }
   .card, .card * { color: #000 !important; }
+  /* 结算报表固定一页：超出部分以导出文件为准 */
+  .report-sheet {
+    box-shadow: none; border: none; margin: 0 auto; overflow: hidden;
+    page-break-inside: avoid; break-inside: avoid;
+  }
 }
